@@ -2,22 +2,52 @@ name: Send emails daily
 on:
   workflow_dispatch:
   schedule:
+    # 北京时间 06:00 / 07:00 / 08:00（UTC 22:00 / 23:00 / 00:00）三档重试，规避 GitHub 调度器延迟/丢任务
     - cron: '0 22 * * *'
+    - cron: '0 23 * * *'
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   calculate-and-send:
     runs-on: ubuntu-latest
     steps:
+      - name: Skip if already sent today
+        id: sent
+        run: |
+          bj_today=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+          since=$(TZ=Asia/Shanghai date -d "${bj_today} 00:00" -u +%Y-%m-%dT%H:%M:%SZ)
+          n=$(curl -sS -G -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs" \
+            --data-urlencode "workflow=main.yml" \
+            --data-urlencode "created=>${since}" \
+            --data-urlencode "status=success" \
+            --data-urlencode "per_page=1" \
+            | jq -r '.total_count // 0' 2>/dev/null || echo 0)
+          echo "beijing today=${bj_today}, since=${since}, successful runs=${n}"
+          if [ "${n}" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already sent today, skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.sent.outputs.skip != 'true'
         uses: actions/checkout@v6
         with:
           repository: ${{ vars.REPOSITORY }}
           ref: ${{ vars.REF }}
 
       - name: Setup uv
+        if: steps.sent.outputs.skip != 'true'
         uses: astral-sh/setup-uv@v7
 
       - name: Run script
+        if: steps.sent.outputs.skip != 'true'
         env:
           ZOTERO_ID: ${{ secrets.ZOTERO_ID }}
           ZOTERO_KEY: ${{ secrets.ZOTERO_KEY }}
