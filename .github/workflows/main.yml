@@ -58,7 +58,15 @@ jobs:
           OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
           CUSTOM_CONFIG: ${{ vars.CUSTOM_CONFIG }}
         run: |
+          set +e
           printf "%b\n" "$CUSTOM_CONFIG" > config/custom.yaml
           echo "Use custom config: "
           cat config/custom.yaml
-          uv run src/zotero_arxiv_daily/main.py
+          uv run src/zotero_arxiv_daily/main.py 2>&1 | tee /tmp/run.log
+          rc=${PIPESTATUS[0]}
+          echo "::notice::script exit code = $rc"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::SCRIPT FAILED with exit code $rc — last 80 log lines:"
+            tail -80 /tmp/run.log | sed 's/^/::error::  /'
+          fi
+          exit $rc
