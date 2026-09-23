@@ -144,12 +144,16 @@ class ArxivRetriever(BaseRetriever):
                     raw_papers.extend(batch)
                     break
                 except arxiv.HTTPError as exc:
-                    if exc.status == 429 and attempt < max_batch_retries - 1:
+                    # 406/429/5xx are transient arXiv API errors (especially during the
+                    # daily announcement window); retry with backoff before giving up.
+                    if exc.status in (406, 429, 500, 502, 503, 504) and attempt < max_batch_retries - 1:
                         wait = batch_retry_delay * (attempt + 1)
-                        logger.warning(f"arXiv API 429 on batch {i // 20}, retry {attempt + 1}/{max_batch_retries} in {wait}s")
+                        logger.warning(f"arXiv API {exc.status} on batch {i // 20}, retry {attempt + 1}/{max_batch_retries} in {wait}s")
                         sleep(wait)
                     else:
-                        raise
+                        # Give up on this batch (but keep the run alive) instead of crashing.
+                        logger.error(f"arXiv API {exc.status} on batch {i // 20} after {attempt + 1} attempts, skipping batch")
+                        break
             if i + 20 < len(all_paper_ids):
                 sleep(3)
         bar.close()
