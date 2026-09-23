@@ -20,14 +20,17 @@ jobs:
         run: |
           bj_today=$(TZ=Asia/Shanghai date +%Y-%m-%d)
           since=$(TZ=Asia/Shanghai date -d "${bj_today} 00:00" -u +%Y-%m-%dT%H:%M:%SZ)
+          # 统计今天「真正发了邮件」的 run：只认本 workflow（main.yml），且运行时长 >60s
+          # （真发送≈12 分钟；跳过≈几秒）。排除 CI/test 的 run 和「跳过」的 run。
           n=$(curl -sS -G -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/runs" \
-            --data-urlencode "workflow=main.yml" \
             --data-urlencode "created=>${since}" \
             --data-urlencode "status=success" \
-            --data-urlencode "per_page=1" \
-            | jq -r '.total_count // 0' 2>/dev/null || echo 0)
-          echo "beijing today=${bj_today}, since=${since}, successful runs=${n}"
+            --data-urlencode "per_page=100" \
+            | jq '[.workflow_runs[]
+                 | select(.path == ".github/workflows/main.yml")
+                 | select(((.updated_at | fromdateiso8601) - ((.run_started_at // .created_at) | fromdateiso8601)) > 60)] | length' 2>/dev/null || echo 0)
+          echo "beijing today=${bj_today}, since=${since}, real sends today=${n}"
           if [ "${n}" -gt 0 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already sent today, skipping."
