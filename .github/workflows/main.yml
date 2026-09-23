@@ -7,6 +7,11 @@ on:
     - cron: '0 23 * * *'
     - cron: '0 0 * * *'
 
+# 同一时刻只允许一个 run 在跑：新的 run 排队等上一个结束，避免并发重复发邮件
+concurrency:
+  group: send-daily
+  cancel-in-progress: false
+
 permissions:
   contents: read
   actions: read
