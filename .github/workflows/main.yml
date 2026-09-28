@@ -27,8 +27,10 @@ jobs:
         run: |
           bj_today=$(TZ=Asia/Shanghai date +%Y-%m-%d)
           since=$(TZ=Asia/Shanghai date -d "${bj_today} 00:00" -u +%Y-%m-%dT%H:%M:%SZ)
-          # 统计今天「真正发了邮件」的 run：只认本 workflow（main.yml），且运行时长 >60s
-          # （真发送≈12 分钟；跳过≈几秒）。排除 CI/test 的 run 和「跳过」的 run。
+          # 统计今天「真正发了邮件」的 run：只认本 workflow（main.yml），且运行时长 >15s
+          # （真发送≈30s~2min，含 Zotero 拉取+RSS+重排+TLDR+发信；跳过≈7s，只跑一次 curl）。
+          # 注意：去掉全文下载后真实发送已从 ~12 分钟降到 ~30 秒，阈值必须跟着降，
+          # 否则永远检测不到「已发」，三档重试会重复发 3 封。
           n=$(curl -sS -G -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/runs" \
             --data-urlencode "created=>${since}" \
@@ -36,7 +38,7 @@ jobs:
             --data-urlencode "per_page=100" \
             | jq '[.workflow_runs[]
                  | select(.path == ".github/workflows/main.yml")
-                 | select(((.updated_at | fromdateiso8601) - ((.run_started_at // .created_at) | fromdateiso8601)) > 60)] | length' 2>/dev/null || echo 0)
+                 | select(((.updated_at | fromdateiso8601) - ((.run_started_at // .created_at) | fromdateiso8601)) > 15)] | length' 2>/dev/null || echo 0)
           echo "beijing today=${bj_today}, since=${since}, real sends today=${n}"
           if [ "${n}" -gt 0 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
