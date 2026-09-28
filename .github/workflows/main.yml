@@ -1,6 +1,12 @@
 name: Send emails daily
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force send even if already sent today (补发用)'
+        required: false
+        type: boolean
+        default: false
   schedule:
     # 北京时间 09:00 / 10:00 / 11:00（UTC 01:00 / 02:00 / 03:00，周一至周五）三档重试
     # arXiv 每天 20:00 ET（= 次日 00:00 UTC = 北京 08:00）才发布新论文；周五/周六晚不发。
@@ -25,6 +31,12 @@ jobs:
       - name: Skip if already sent today
         id: sent
         run: |
+          # 手动补发（force=true）直接跳过「今日已发」检查
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Force send requested, bypassing 'already sent today' guard."
+            exit 0
+          fi
           bj_today=$(TZ=Asia/Shanghai date +%Y-%m-%d)
           since=$(TZ=Asia/Shanghai date -d "${bj_today} 00:00" -u +%Y-%m-%dT%H:%M:%SZ)
           # 统计今天「真正发了邮件」的 run：只认本 workflow（main.yml），且运行时长 >15s
