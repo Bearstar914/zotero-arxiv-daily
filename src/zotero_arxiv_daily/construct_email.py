@@ -52,12 +52,13 @@ def get_empty_html():
   """
   return block_template
 
-def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None):
+def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None, tag:str=None):
+    tag_html = f' <span style="font-size:12px; color:#fff; background-color:#2b6cb0; padding:2px 8px; border-radius:10px; vertical-align:middle;">{tag}</span>' if tag else ''
     block_template = """
     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
     <tr>
         <td style="font-size: 20px; font-weight: bold; color: #333;">
-            {title}
+            {title}{tag_html}
         </td>
     </tr>
     <tr>
@@ -85,7 +86,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
     </tr>
 </table>
 """
-    return block_template.format(title=title, authors=authors,rate=rate, tldr=tldr, pdf_url=pdf_url, affiliations=affiliations)
+    return block_template.format(title=title, authors=authors, rate=rate, tldr=tldr, pdf_url=pdf_url, affiliations=affiliations, tag_html=tag_html)
 
 def get_stars(score:float):
     full_star = '<span class="full-star">⭐</span>'
@@ -125,7 +126,7 @@ def render_email(papers:list[Paper]) -> str:
                 affiliations += ', ...'
         else:
             affiliations = 'Unknown Affiliation'
-        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations))
+        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations, tag=p.match_tag))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)

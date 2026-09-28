@@ -90,6 +90,31 @@ class Executor:
         return corpus
 
     
+    def _keyword_hits(self, paper, terms) -> bool:
+        text = ((paper.title or "") + " " + (paper.abstract or "")).lower()
+        return any(term.lower() in text for term in terms)
+
+    def _ensure_keyword_coverage(self, papers):
+        # 兜底：保证每天至少各推 1 篇命中关键词主题（如决策树/聚类/贝叶斯）的论文。
+        # 命中论文提前到列表头部，其余仍按相似度分数排序；某主题当天无命中则跳过。
+        groups = self.config.keywords if "keywords" in self.config else None
+        if not groups:
+            return papers
+        head, picked = [], set()
+        for g in groups:
+            for p in papers:
+                if id(p) in picked:
+                    continue
+                if self._keyword_hits(p, g.terms):
+                    p.match_tag = g.name
+                    head.append(p)
+                    picked.add(id(p))
+                    break
+        if head:
+            logger.info(f"Keyword coverage: pinned {[p.match_tag for p in head]} to top")
+        tail = [p for p in papers if id(p) not in picked]
+        return head + tail
+
     def run(self):
         corpus = self.fetch_zotero_corpus()
         corpus = self.filter_corpus(corpus)
@@ -110,6 +135,7 @@ class Executor:
         if len(all_papers) > 0:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
+            reranked_papers = self._ensure_keyword_coverage(reranked_papers)
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):

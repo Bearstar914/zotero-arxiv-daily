@@ -46,6 +46,14 @@ reranker:
     model: null # The model name of the embedding model. Example: text-embedding-3-large
     batch_size: null # The batch size for embedding API requests. Adjust to match your provider's limit. Example: 64
 
+keywords: null # Optional: guarantee at least one paper per topic in the daily email. List of {name, terms}. Example:
+# - name: "决策树"
+#   terms: ["decision tree", "random forest", "gradient boosting"]
+# - name: "聚类"
+#   terms: ["clustering", "k-means", "unsupervised"]
+# - name: "贝叶斯"
+#   terms: ["bayesian", "graphical model", "bayesian inference"]
+
 executor:
   debug: false # Whether to use debug mode. Example: true
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
